@@ -21,7 +21,7 @@ func main() {
 
 	q, err := ch.QueueDeclare(
 		"task_queue", // name
-		false,        // durable
+		true,         // durable ; we need to make sure that RabbitMQ will never lose our queue. In order to do so, we need to declare it as durable:
 		false,        // delete when unused
 		false,        // exclusive
 		false,        // no-wait
@@ -29,6 +29,10 @@ func main() {
 	)
 	failOnError(err, "Failed to declare a queue")
 
+	// In order to defeat that we can set the prefetch count with the value of 1.
+	// This tells RabbitMQ not to give more than one message to a worker at a time.
+	// Or, in other words, don't dispatch a new message to a worker until it has processed and acknowledged the previous one.
+	// Instead, it will dispatch it to the next worker that is not still busy
 	err = ch.Qos(
 		1,     // prefetch count
 		0,     // prefetch size
@@ -39,7 +43,7 @@ func main() {
 	msgs, err := ch.Consume(
 		q.Name, // queue
 		"",     // consumer
-		true,   // auto-ack
+		false,  // auto-ack
 		false,  // exclusive
 		false,  // no-local
 		false,  // no-wait
@@ -56,6 +60,7 @@ func main() {
 			t := time.Duration(dot_count)
 			time.Sleep(t * time.Second)
 			log.Printf("Done")
+			d.Ack(false) // manual ack
 		}
 	}()
 
